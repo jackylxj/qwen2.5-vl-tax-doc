@@ -2,25 +2,40 @@
 
 中文增值税发票图像转 JSON。使用 Qwen2.5-VL-7B-Instruct 与 RapidOCR 提取票号、日期、购买方名称、购买方税号和价税合计，并通过 vLLM 和 FastAPI 提供接口。
 
-本仓库整理了 2026 年 11 月公开复现实验的五字段推理代码、LoRA 配置、评分方法及脱敏结果。部署配置采用基座加 OCR，LoRA 作为对照实验。
+项目覆盖数据准备、LoRA 微调对照、OCR 辅助视觉理解、结构化评分与 API 部署。通过固定标签、逐字段评测和服务复测选择推理配置，最终采用基座加 OCR。
 
-## 实测结果
+## 系统设计
 
-| 最终独立评测 | 基座加 OCR | 追加税号栏复读 |
-|---|---:|---:|
-| 字段匹配 | 68/72 | 69/72 |
-| 整票五字段全对 | 11/14 | 11/14 |
-| 空税号正确返回 null | 1/3 | 2/3 |
-| 非空税号正确 | 12/12 | 12/12 |
-| 价税合计正确 | 13/14 | 13/14 |
+```mermaid
+flowchart LR
+    A[发票 JPEG] --> B[FastAPI 输入检查]
+    B --> C[CPU RapidOCR]
+    B --> D[GPU Qwen2.5-VL]
+    C --> D
+    D --> E[五字段 JSON]
+    E --> F[字段匹配与整票评测]
+```
 
-共 15 张独立发票。14 张各计五字段，另一张日期模糊，仅计两个可核对字段。10 张数电票中有 7 张来自同一购方，结果反映这批小样本的覆盖范围。字段得分包含空值，漏键计错。原件阅核和 PDF 文本层用于建立参考答案，模型输入使用图像及重新运行的 OCR。
+- **多模态抽取** 将原图与 OCR 转写共同交给模型，输出统一的五字段 JSON，覆盖普通发票、数电票和含折扣行的票面。
+- **参数高效微调** 使用 LLaMA-Factory 完成 LoRA 训练，比较基座、适配器及 OCR 组合，依据验证结果选择部署方案。
+- **可核验评测** 按票号去重并在推理前固定标签，分别统计字段匹配和整票匹配，保留空值及前导零的评分要求。
+- **服务化交付** CPU 执行 OCR，A10 GPU 通过 vLLM 推理，FastAPI 提供图片输入、JSON 输出及异常响应。
 
-单张 NVIDIA A10、串行回环 API 请求的中位耗时为 5.59 秒，包含 OCR。关闭 vLLM 前缀缓存后，5 张复测逐字段复现。详细条件见 [实验记录](docs/experiment.md)，聚合指标见 [final_metrics.json](results/final_metrics.json)。
+## 验证结果
+
+| 指标 | 实测结果 |
+|---|---:|
+| 独立发票评测 | 15 张 |
+| 已标注字段匹配 | 68/72（94.4%） |
+| 完整标注发票五字段全对 | 11/14 |
+| 端到端请求耗时中位数 | 5.59 秒/张 |
+| 抽样 API 复测逐字段一致 | 5/5 |
+
+14 张发票各标注五字段，另 1 张标注两个可核对字段，共 72 项。成绩来自基座加 OCR 配置。耗时为单张 NVIDIA A10 上串行回环 API 请求的测量结果，包含 OCR。样本组成、训练对照和配置选择依据见 [实验记录](docs/experiment.md)，聚合指标见 [final_metrics.json](results/final_metrics.json)。
 
 ## 快速查看结果
 
-使用 Python 3.10 及以上，在仓库根目录执行。此命令仅需标准库，打印三组已记录并脱敏的正常票、折扣票和失败票结果。
+使用 Python 3.10 及以上，在仓库根目录执行。此命令仅需标准库，打印三组已记录并脱敏的电力票、折扣票和工程票结果，用于展示输出及字段核对。
 
 ```bash
 python scripts/demo.py
@@ -30,7 +45,7 @@ examples/recorded_cases.json 保留日期和金额，票号、税号和购买方
 
 ## 启动实时服务
 
-实验环境使用 Python 3.12/3.13。以下依赖范围用于安装，具体 GPU 环境需匹配 PyTorch、CUDA 和 vLLM。公开打包版完成离线回放、评分与 API 契约检查，GPU 实测数字来自上述实验环境。
+实验环境使用 Python 3.12/3.13。以下依赖范围用于安装，具体 GPU 环境需匹配 PyTorch、CUDA 和 vLLM。仓库代码已完成离线案例、评分规则和 API 契约检查。GPU 测量条件记录在实验文档中。
 
 ```bash
 python -m venv .venv
@@ -54,7 +69,7 @@ python scripts/demo.py --image /path/to/invoice.jpg
 
 ## LoRA 训练与评分
 
-使用 LLaMA-Factory，安装方式见其官方仓库。训练参数为 rank 8、alpha 16、q_proj/v_proj、冻结视觉模块和多模态投影层、学习率 0.0001、两轮。实际实验训练 29 张广东专票，购买方税号只有一种。
+使用 LLaMA-Factory，安装方式见其官方仓库。训练参数为 rank 8、alpha 16、q_proj/v_proj、冻结视觉模块和多模态投影层、学习率 0.0001、两轮。训练对照使用 29 张中文增值税专用发票。
 
 准备 data/manifest.json，格式为 train 列表，每项包含 id 和 target 五字段对象。把对应图片放到 images/id.jpg，再执行以下命令。
 
@@ -71,18 +86,11 @@ python scripts/score.py data/gold.json outputs/predictions
 
 日期按年月日、金额按数值归一，票号及税号保留前导零，空栏要求 JSON null。
 
-## 已知限制
-
-空税号误填、票号多生成前导零以及价税合计读错列仍有发生。当前成绩对应五字段任务。整票明细、申报表和政策检索已在实验工程中做过小规模演示，独立评测和公开可复用入口仍待扩展。模型输出需要按使用场景核验。
-
-## 参考实现与数据来源
+## 技术依赖
 
 - [Qwen2.5-VL](https://github.com/QwenLM/Qwen2.5-VL)
 - [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory)
 - [RapidOCR](https://github.com/RapidAI/RapidOCR)
 - [vLLM](https://github.com/vllm-project/vllm)
-- [飞桨 zzsfp 数据页](https://aistudio.baidu.com/datasetdetail/165561)
-- [VATID](https://github.com/FuxiJia/InvoiceDatasets)
-- [电子发票解析样例](https://github.com/jiangnanboy/pdf_invoice_parser)
 
-依赖库、模型和数据遵循各自的使用及许可条件。公开仓库代码尚未指定独立开源许可证。
+数据来源、原件准备和脱敏方式见 [数据说明](docs/data.md)。依赖库、模型及数据按各自的使用条件获取。
