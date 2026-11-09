@@ -29,6 +29,18 @@ flowchart LR
     D --> E[Five-field JSON]
 ```
 
+### Core code map
+
+| Capability | Implementation |
+|---|---|
+| JPEG validation, OCR, and API errors | [api.py](app/api.py) |
+| Image + OCR prompt and vLLM request | [infer.py](app/infer.py) |
+| Five-field extraction instructions | [invoice_prompt.txt](configs/invoice_prompt.txt) |
+| Multimodal training data conversion | [prepare_training.py](scripts/prepare_training.py) |
+| LoRA configuration and log retention | [lora.yaml](configs/lora.yaml), [training guide](docs/training.md) |
+| Field and exact-document scoring | [score.py](scripts/score.py) |
+| GPU serving configuration | [serve_model.sh](scripts/serve_model.sh) |
+
 ### Start the service
 
 Use a CUDA-enabled Linux GPU environment with compatible PyTorch and vLLM dependencies.
@@ -94,6 +106,18 @@ flowchart LR
     C --> D
     D --> E[五字段 JSON]
 ```
+
+### 核心代码导航
+
+| 能力 | 实现入口 |
+|---|---|
+| JPEG 校验、OCR 与 API 错误响应 | [api.py](app/api.py) |
+| 图像与 OCR 提示词、vLLM 请求 | [infer.py](app/infer.py) |
+| 五字段抽取指令 | [invoice_prompt.txt](configs/invoice_prompt.txt) |
+| 多模态训练数据转换 | [prepare_training.py](scripts/prepare_training.py) |
+| LoRA 配置与日志留存 | [lora.yaml](configs/lora.yaml)、[训练说明](docs/training.md) |
+| 字段及整票评分 | [score.py](scripts/score.py) |
+| GPU 服务配置 | [serve_model.sh](scripts/serve_model.sh) |
 
 ### 启动服务
 
