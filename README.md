@@ -59,7 +59,15 @@ Set MODEL_PATH to a local model directory if needed. The model server listens on
 uvicorn app.api:app --host 127.0.0.1 --port 18642
 ```
 
-Open http://127.0.0.1:18642/docs to call POST /extract/tax with an image_b64 string and optional use_ocr boolean. OCR is enabled by default. Inputs must be JPEG images of no more than 20 million pixels. Invalid images return 422 and upstream failures return 502. Use SSH forwarding for remote access to the loopback service.
+Open http://127.0.0.1:18642/docs to call POST /extract/tax with an image_b64 string and optional use_ocr boolean. OCR is enabled by default. Inputs must be JPEG images of no more than 20 million pixels. Invalid inputs return 422, invalid upstream output returns 502, OCR failures return 503, and model timeouts return 504. See the [API contract and tests](docs/api.md). Use SSH forwarding for remote access to the loopback service.
+
+### Offline tests
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+No GPU or model weights are needed. See [test coverage](docs/api.md).
 
 ### Training and evaluation tools
 
@@ -137,7 +145,15 @@ bash scripts/serve_model.sh
 uvicorn app.api:app --host 127.0.0.1 --port 18642
 ```
 
-访问 http://127.0.0.1:18642/docs，通过 POST /extract/tax 提交 image_b64 字符串和可选的 use_ocr 布尔值。OCR 默认开启。输入须为 JPEG，且不超过两千万像素。无效图片返回 422，上游失败返回 502。远程使用时可通过 SSH 转发访问回环服务。
+访问 http://127.0.0.1:18642/docs，通过 POST /extract/tax 提交 image_b64 字符串和可选的 use_ocr 布尔值。OCR 默认开启。输入须为 JPEG，且不超过两千万像素。无效输入返回 422，上游输出异常返回 502，OCR 故障返回 503，模型超时返回 504。详见[接口契约与测试](docs/api.md)。远程使用时可通过 SSH 转发访问回环服务。
+
+### 离线测试
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+无需 GPU 或模型权重，覆盖范围见[测试说明](docs/api.md)。
 
 ### 训练与评测工具
 
