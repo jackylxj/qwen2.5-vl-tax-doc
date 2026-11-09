@@ -16,3 +16,10 @@ llf_adapter/
 *.tgz
 *.zip
 *.safetensors
+
+# Local experiment archives are not part of the source release.
+/docs/experiment.md
+/examples/recorded_cases.json
+/results/final_metrics.json
+/results/training_comparison.json
+/scripts/demo.py
