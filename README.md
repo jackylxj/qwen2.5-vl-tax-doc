@@ -65,7 +65,7 @@ uvicorn app.api:app --host 127.0.0.1 --port 18642
 python scripts/demo.py --image /path/to/invoice.jpg
 ```
 
-接口文档位于 http://127.0.0.1:18642/docs。POST /extract/tax 接收 image_b64 和可选的 use_ocr，默认开启 OCR。输入要求 JPEG 且不超过两千万像素，坏图返回 422，上游错误返回 502。服务默认监听回环地址，远程使用可建立 SSH 转发。
+接口文档位于 http://127.0.0.1:18642/docs.POST /extract/tax 接收 image_b64 和可选的 use_ocr，默认开启 OCR。输入要求 JPEG 且不超过两千万像素，坏图返回 422，上游错误返回 502。服务默认监听回环地址，远程使用可建立 SSH 转发。
 
 ## LoRA 训练与评分
 
